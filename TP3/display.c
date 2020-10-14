@@ -6,6 +6,7 @@
 #include <string.h>
 #include <time.h>
 #include <dirent.h> 
+#include "display.h"
 
 void ultrals(char* path) {
 
@@ -44,7 +45,7 @@ void ultrals(char* path) {
         struct dirent *de;  
 
         //Readdir renvoie un nouveau pointeur représentant le prochain dossier dans le 
-        //dossier pointé par dr. (on commence à path)
+        //dossier pointé par dr. (on commence à path) https://pubs.opengroup.org/onlinepubs/7990989775/xsh/readdir.html
         while ((de = readdir(dr)) != NULL) {
             //Si on est pas sur un nom de directoire local et directoire parent
             //readdir les liste, faut pas sinon on finit jamais...
