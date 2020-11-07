@@ -61,15 +61,13 @@ int main(int argc, char* argv[]) {
             
         switch(user_params.cmd) {
             case 'g':
-                printf("cmd = F_GETLK \n");
                 params.cmd = F_GETLK;
                 break;
             case 's':
-                printf("cmd = F_SETLK \n");
                 params.cmd = F_SETLK;
                 break;
             case 'w':
-                printf("cmd = F_SETLKW \n");
+                printf("Attempting to place lock\n");
                 params.cmd = F_SETLKW;
                 break;
             default:
@@ -78,15 +76,12 @@ int main(int argc, char* argv[]) {
 
         switch(user_params.l_type) { 
             case 'w':
-                printf("l_type = F_WRLCK \n");
                 params.l_type = F_WRLCK; 
                 break;  
             case 'r':
-                printf("l_type = F_RDLCK \n");
                 params.l_type = F_RDLCK;
                 break;
             case 'u':
-                printf("l_type = F_UNLCK \n");
                 params.l_type = F_UNLCK;
             default:
                 break;
@@ -110,11 +105,7 @@ int main(int argc, char* argv[]) {
         params.start = user_params.start;
         
     
-        getchar(); //virer le fils de pute de \n.
-
-        /*printf("parameters are : %c, %c, %i, %i, %c \n", user_params.cmd,
-        user_params.l_type, user_params.start, user_params.length, user_params.whence);*/
-        
+        getchar(); //virer le chien de \n.
         
         //ouverture du fichier. 
         int fd = open(argv[1], O_RDWR);
@@ -127,10 +118,9 @@ int main(int argc, char* argv[]) {
 
         //struct * flock permet de passer ou recevoir les paramètres du verrou.
         int status = fcntl(fd, params.cmd, &f1);
-        printf("status = %i \n", status);
-        
+         
         //On récupère de l'information sur le verrou.
-        if (params.cmd == F_GETLK) { /* F_GETLK*/
+        if (params.cmd == F_GETLK) {
             //Si on a réussi à récupérer les infos du verrou.
             if (status == 0) {
                 //fcntl retourne F_UNLCK si le verrou est placable.
@@ -139,30 +129,26 @@ int main(int argc, char* argv[]) {
                     printf("[PID=%ld] can place exclusif lock (currently). \n", (long) getpid());
                 //si on ne peut pas le mettre.
                 } else if ((f1.l_type != F_UNLCK) && (params.l_type == F_WRLCK)) { 
-                    printf("[PID=%ld] cannot place exclusif lock. (exclusif lock held by PID=%d) \n", (long) getpid(), f1.l_pid);
+                    printf("[PID=%ld] cannot place exclusif lock. (exclusif lock on %ld:%ld held by PID=%d) \n", (long) getpid(), f1.l_start, (f1.l_len + f1.l_start), f1.l_pid);
                 }
                 
                 //si on aimerai mettre un verrou partagé
                 if ((f1.l_type == F_UNLCK) && (params.l_type == F_RDLCK))  {
                     printf("[PID=%ld] Can place read lock \n", (long) getpid());
                 } else if(params.l_type == F_RDLCK){ //si on ne peux pas le mettre.
-                    printf("[PID=%ld] cannot place shared lock. \n", (long) getpid());
+                    printf("[PID=%ld] cannot place shared lock. (exclusif lock held by PID=%d)\n", (long) getpid(), f1.l_pid);
                 }
-
-                //si on aimerait enlever un verrou.
-                if ((f1.l_type == F_UNLCK) && (params.l_type == F_UNLCK)) {
-                    printf("[PID=%ld] Can remove lock. \n", (long) getpid());
-                } else if(params.l_type == F_UNLCK) { //si on ne peut pas l'enlever.
-                    printf("[PID=%ld] cannot remove lock. \n", (long) getpid());
-                }
-            } else if (errno == EAGAIN) {
+                
+            } else if ((errno == EAGAIN) || (errno == EACCES)) {
                 // process results and print informative text
                 printf("Operation denied due to locks held by other processes. \n");
+            //errno becomes EINVAL if we attempt to get an unlock, which makes no sense.
+            } else if(errno == EINVAL) {
+                printf("Invalid argument, did you try to get an unlock ? \n");
             }
-        } else { /* F_SETLK, F_SETLKW */
-            // check status and handle errors (look at manual for possible errors)
+        } else { // F_SETLK, F_SETLKW
+            //We check the status and handle errors.
             if (status == 0) {
-                
                 switch(params.cmd) {
                     case F_SETLK:
                         //si on a placé un readlock.
@@ -174,12 +160,15 @@ int main(int argc, char* argv[]) {
                             printf("[PID=%ld] Set write lock without errors. \n", (long) getpid());
                             break;
                         }
-                        if (params.l_type == F_UNLCK) {
-                            printf("[PID=%ld] Released lock without errors. \n", (long) getpid());
+                        //si on a enlevé un lock d'écriture, faut voir si on a réussi à le faire.
+                        if ((params.l_type == F_UNLCK) && (f1.l_type == F_UNLCK)) {
+                            printf("[PID=%ld] Attempted to release lock (unlock will not work on exclusif lock held by other process). \n", (long) getpid());
                             break;
+                        } else {
+                            printf("Here\n");
                         }
                         break;
-
+                    //placement d'un verrou d'attente.
                     case F_SETLKW:
                         //si on a placé un readlock.
                         if((params.l_type == F_RDLCK) && (f1.l_type == F_RDLCK)) {
