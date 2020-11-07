@@ -112,8 +112,8 @@ int main(int argc, char* argv[]) {
     
         getchar(); //virer le fils de pute de \n.
 
-        printf("parameters are : %c, %c, %i, %i, %c \n", user_params.cmd,
-        user_params.l_type, user_params.start, user_params.length, user_params.whence);
+        /*printf("parameters are : %c, %c, %i, %i, %c \n", user_params.cmd,
+        user_params.l_type, user_params.start, user_params.length, user_params.whence);*/
         
         
         //ouverture du fichier. 
@@ -128,7 +128,7 @@ int main(int argc, char* argv[]) {
         //struct * flock permet de passer ou recevoir les paramètres du verrou.
         int status = fcntl(fd, params.cmd, &f1);
         printf("status = %i \n", status);
-        printf("errno = %d \n", errno);
+        
         //On récupère de l'information sur le verrou.
         if (params.cmd == F_GETLK) { /* F_GETLK*/
             //Si on a réussi à récupérer les infos du verrou.
@@ -137,8 +137,9 @@ int main(int argc, char* argv[]) {
                 //si on aimerait mettre un verrou exclusif.
                 if ((f1.l_type == F_UNLCK) && (params.l_type == F_WRLCK)) {
                     printf("[PID=%ld] can place exclusif lock (currently). \n", (long) getpid());
-                } else if(params.l_type == F_WRLCK){ //si on ne peut pas le mettre.
-                    printf("[PID=%ld] cannot place exclusif lock. \n", (long) getpid());
+                //si on ne peut pas le mettre.
+                } else if ((f1.l_type != F_UNLCK) && (params.l_type == F_WRLCK)) { 
+                    printf("[PID=%ld] cannot place exclusif lock. (exclusif lock held by PID=%d) \n", (long) getpid(), f1.l_pid);
                 }
                 
                 //si on aimerai mettre un verrou partagé
@@ -165,7 +166,7 @@ int main(int argc, char* argv[]) {
                 switch(params.cmd) {
                     case F_SETLK:
                         //si on a placé un readlock.
-                        if((params.l_type == F_RDLCK) && (f1.l_type == F_UNLCK)) {
+                        if (params.l_type == F_RDLCK) {
                             printf("[PID=%ld] Set read lock without errors. \n", (long) getpid());
                             break;
                         }
@@ -173,7 +174,7 @@ int main(int argc, char* argv[]) {
                             printf("[PID=%ld] Set write lock without errors. \n", (long) getpid());
                             break;
                         }
-                        if((params.l_type == F_UNLCK) && (f1.l_type == F_UNLCK)) {
+                        if (params.l_type == F_UNLCK) {
                             printf("[PID=%ld] Released lock without errors. \n", (long) getpid());
                             break;
                         }
@@ -182,23 +183,23 @@ int main(int argc, char* argv[]) {
                     case F_SETLKW:
                         //si on a placé un readlock.
                         if((params.l_type == F_RDLCK) && (f1.l_type == F_RDLCK)) {
-                            printf("[PID=%ld] Set read lock without errors. \n", (long) getpid());
+                            printf("[PID=%ld] Set wait read lock without errors. \n", (long) getpid());
                             break;
                         }
                         if((params.l_type == F_WRLCK) && (f1.l_type == F_WRLCK)) {
-                            printf("[PID=%ld] Set write lock without errors. \n", (long) getpid());
+                            printf("[PID=%ld] Set wait write lock without errors. \n", (long) getpid());
                             break;
                         }
                         if((params.l_type == F_UNLCK) && (f1.l_type == F_UNLCK)) {
-                            printf("[PID=%ld] Released lock without errors. \n", (long) getpid());
+                            printf("[PID=%ld] Released wait lock without errors. \n", (long) getpid());
                             break;
                         }
                         break;
-                    break;
                 }                
-            } else if (errno == EAGAIN) {
-            // process results and print informative text
-                printf("Access error \n");
+            } else if ((errno == EAGAIN) || (errno == EACCES)) {
+                //process results and print informative text
+                printf("%s\n", strerror(errno));
+                printf("Access error, another process is holding an exclusif or shared lock. \n");
             }
         }
     }
