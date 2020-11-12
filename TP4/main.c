@@ -113,14 +113,14 @@ int main(int argc, char* argv[]) {
                     printf("[PID=%ld] can place exclusif lock (currently). \n", (long) getpid());
                 //si on ne peut pas le mettre.
                 } else if ((f1.l_type != F_UNLCK) && (params.l_type == F_WRLCK)) { 
-                    printf("[PID=%ld] cannot place exclusif lock. (exclusif lock on %ld:%ld held by PID=%d) \n", (long) getpid(), f1.l_start, (f1.l_len + f1.l_start), f1.l_pid);
+                    printf("[PID=%ld] cannot place exclusif lock. (lock on %ld:%ld held by PID=%d) \n", (long) getpid(), f1.l_start, (f1.l_len + f1.l_start - 1), f1.l_pid);
                 }
                 
                 //si on aimerai mettre un verrou partagé
                 if ((f1.l_type == F_UNLCK) && (params.l_type == F_RDLCK))  {
                     printf("[PID=%ld] Can place read lock \n", (long) getpid());
                 } else if(params.l_type == F_RDLCK){ //si on ne peux pas le mettre.
-                    printf("[PID=%ld] cannot place shared lock. (exclusif lock held by PID=%d)\n", (long) getpid(), f1.l_pid);
+                    printf("[PID=%ld] cannot place shared lock. (lock held by PID=%d)\n", (long) getpid(), f1.l_pid);
                 }
                 
             } else if ((errno == EAGAIN) || (errno == EACCES)) {
@@ -146,10 +146,8 @@ int main(int argc, char* argv[]) {
                         }
                         //si on a enlevé un lock d'écriture, faut voir si on a réussi à le faire.
                         if ((params.l_type == F_UNLCK) && (f1.l_type == F_UNLCK)) {
-                            printf("[PID=%ld] Attempted to release lock (unlock will not work on exclusif lock held by other process). \n", (long) getpid());
+                            printf("[PID=%ld] Attempted to release lock (unlock will not work on locks held by another process). \n", (long) getpid());
                             break;
-                        } else {
-                            printf("Here\n");
                         }
                         break;
                     //placement d'un verrou d'attente.
