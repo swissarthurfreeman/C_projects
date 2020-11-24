@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#define PORT 65104
+//#define PORT 65112
 
 #define TOO_LOW 0
 #define TOO_HIGH 1
@@ -18,7 +18,10 @@ int get_number() {
     return n;
 }
 
-int main(int argc, char argv[]) {
+int main(int argc, char * argv[]) {
+
+    int PORT = strtol(argv[1], NULL, 10);
+
     int client = socket(AF_INET, SOCK_STREAM, 0);
     if(client < 0) {
         //traiter erreur
@@ -47,7 +50,7 @@ int main(int argc, char argv[]) {
         //on envoie ce que l'utilisateur a entré.
         int input = get_number();
         
-        //printf("input is = %d\n", input);
+        //On travaille avec des valeurs de 8 bits.
         unsigned char casted;
         casted = (unsigned char) input;
         write(client, NULL, 1);
