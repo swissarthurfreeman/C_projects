@@ -10,20 +10,24 @@
 #include <errno.h>
 #include <sys/wait.h>
 
-//J'utilise des entiers non signés pour plus de facilité.
+//J'utilise des entiers non signés 
+//pour plus de facilité.
+//On envoie des unsigned char (codés sur 8 bits)
 #define TOO_LOW 0
 #define TOO_HIGH 1
 #define WIN 2
 #define LOSE 3
 #define ESSAIS 10
-//#define PORT 65112
 
 int main(int argc, char * argv[]) {
-    //int PORT = argv[1];
-    //printf("%s", argv[1]);
     int PORT = strtol(argv[1], NULL, 10);
+    //on ne veux pas que l'utilisateur fournissent n'importe quoi en entrée.
+    if (PORT > 65535 || PORT < 1024) { 
+        printf("Error, port supplied isn't adequate\n(must be between 1024 and 65'535) \n");
+        exit(-1);
+    }
 
-    //on crée un socket en IPv4, en mot connexion oriented
+    //on crée un socket en IPv4, en mode connexion oriented
     //stream de protocole TCP.
     int serv_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (serv_fd <= -1) {
@@ -47,21 +51,22 @@ int main(int argc, char * argv[]) {
     if (res != 0) {
         //En cas d'erreur de binding.
         printf("Binding Error\n");
+        //Souvent c'est que l'adresse fournie est déjà utilisée.
         printf("%s\n", strerror(errno));
         exit(-1);
     }
 
-    printf("Server listening on port %i\n", PORT);
+    printf("Server listening on port %i \n", PORT);
 
     //on configure le serveur comme étant un serveur d'écoute passif.
     int queue = 5;
     int c = listen(serv_fd, queue);
     if ( c < 0) { printf("Listening call error \n"); }
     
-    //nombre entre 23 et 148. même intervale pour tout client.
+    //nombre entre 23 et 148. même intervalle pour tout client.
     unsigned char min = 23; 
     unsigned char max = 148;
-    accept:printf("\n");
+    accept:printf(" ");
     //on initialise l'addresse du client, elle sera configurée
     //par l'appel à accept.
     struct sockaddr_in addresse_client;
@@ -72,41 +77,43 @@ int main(int argc, char * argv[]) {
     int socket_client = accept(serv_fd, (struct sockaddr *) &addresse_client, &longueur_client);
     
     printf("Client %i address is %s \n", socket_client, inet_ntoa(addresse_client.sin_addr));
-
     pid_t pid = fork(); //a chaque accept on fork le processus.
-
+    //si on est dans le parent (pid > 0)
     if (pid > 0) {
         //car on administre ce socket dans le fork.
-        //close(socket_client); 
-        goto accept;
-    
+        close(socket_client);  //on aura toujours les mêmes numéros...
+        goto accept; //on reaccepte une connection.
+    //si le pid est nul c'est l'enfant
     } else if (pid == 0) {
-
-        pid_t pid_p = fork();
-        
+        //on lui recrée un enfant, afin d'éviter les zombies.
+        pid_t pid_p = fork();  
         if (pid_p == 0) {
-
+            //il faut initialiser le générateur de nbs premiers. (seed)
             srand(time(NULL));
-            //int rand = open("/dev/urandom", O_RDONLY);
+            //on génère avec rand, je ne lit pas dans /dev/urandom car je suis sur
+            //WSL et le fichier n'est pas fonctionnel. Rand fonctionne parfaitement.
             unsigned char number = rand() % 126 + min;
             printf("La valeur %d est choisie pour le client %d \n", number, socket_client);
-
-            write(socket_client, &min, 1);
+            
+            //On envoie la borne inférieure et supérieure au client.
+            //on écrit sur le fd du socket, on envoie 1 octet (1 char)
+            write(socket_client, &min, 1); 
             write(socket_client, &max, 1);
-
+            
             int nb_essais = 0;
             unsigned char cmd;
             while(1) {
+                //si on a fait trop d'essais
                 if (nb_essais > 10) {
-                    cmd = LOSE;
-                    write(socket_client, &cmd, 1);
+                    cmd = LOSE; //on a perdu
+                    write(socket_client, &cmd, 1); //on notifie le client
                     write(socket_client, &number, 1);
-                    exit(EXIT_SUCCESS);
+                    exit(EXIT_SUCCESS); //et on ferme le serveur (cette instance)
                 }
                 //on lit l'essai de l'utilisateur.
                 unsigned char res;
-                read(socket_client, NULL, 1);
-                read(socket_client, &res, 1);
+                read(socket_client, NULL, 1); //le premier octet est ignoré
+                read(socket_client, &res, 1); //le deuxième contient la réponse
 
                 printf("Client %d propose %d \n", socket_client, res);
 
@@ -118,13 +125,14 @@ int main(int argc, char * argv[]) {
                     write(socket_client, &number, 1);
                     exit(EXIT_SUCCESS);
                 } else {
+                    //sinon, on incrémente le nombre d'essais
                     nb_essais = nb_essais + 1;
-                    if(res > number) {
-                        cmd = TOO_HIGH;
+                    if(res > number) { //si l'essai est trop grand
+                        cmd = TOO_HIGH; //on lui dit
                         write(socket_client, &cmd, 1);
                         write(socket_client, &number, 1);
-                    } else {
-                        cmd = TOO_LOW;
+                    } else { //si c'est trop petit
+                        cmd = TOO_LOW; //idem
                         write(socket_client, &cmd, 1);
                         write(socket_client, &number, 1);
                     }
