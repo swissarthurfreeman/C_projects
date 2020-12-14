@@ -11,43 +11,20 @@
 #include "builtin.h"
 #include "handlers.h"
 
-//To Do : 
-/*
-1) Réparer problème ou Ctrl+C stoppe une tâche en fond.
-2) Réparer gestion de SIGHUP qui ne fait pas ce qu'il faut
-    -Cas ou on a une tâche en fond
-    -Cas ou on a deux tâches en fond
-3) Réparer les erreurs par rapport aux variables globals fore_pid et back_pid.
-*/
-
 extern pid_t fore_pid, back_pid;
+
 int main() {
-    //gérance de SIGCHLD.
-    struct sigaction sa;
-    memset(&sa, 0, sizeof(sa));
-    sa.sa_sigaction = gordon_child_handler;
-
-    //SA_RESTART fait en sorte que si un signal handler
-    //interromp l'execution d'un système call, alors on relance
-    //celui ci une fois que le handler renvoie.
-    sa.sa_flags = SA_SIGINFO | SA_RESTART; //man sigaction.
-    sigaction(SIGCHLD, &sa, NULL);
-
-    //gérance des autres
-    struct sigaction signa;
-    signa.sa_handler = gordon_handler;
-    signa.sa_flags = SA_RESTART;
-
-    sigaction(SIGTERM, &signa, NULL);
-    sigaction(SIGQUIT, &signa, NULL);
-    sigaction(SIGINT, &signa, NULL);
-    sigaction(SIGHUP, &signa, NULL);
-
-    start:printf("gordon@%s> ", getcwd(NULL, 0));
+    set_masks();
 
     while (1) {
         
-        sigaction(SIGINT, &signa, NULL); //permet de Ctrl+C a l'infini.
+        start:printf("\033[1;31m");
+        printf("gordon");    
+        printf("\033[1;34m");
+        printf("@%s> " , getcwd(NULL, 0));
+        printf("\033[0;37m");
+        
+        //sigaction(SIGINT, &signa, NULL); //permet de Ctrl+C a l'infini.
         //On récupère l'entrée utilisateur avec fgets. (max 1024 charactères)
         char * input = malloc(1024);
         char * res = fgets(input, 1024, stdin);
@@ -60,8 +37,10 @@ int main() {
         //on enlève newline sinon ça casse tout.
         for(int i = 0; i < 1024; i++) {
             if (input[i] == '\n') {
-                if (i == 0)
+                if (i == 0) {
                     goto start; //cas ou on a juste appuyé sur enter.
+                }
+                printf("\033[0;37m");
                 input[i] = '\0';
             }
         }
@@ -89,24 +68,34 @@ int main() {
             //on écrit gordon@path>nom_programme [options] &
             int back = 0;
             if(argvalues[argcount - 1][0] == '&') {
-                argvalues[argcount - 1][0] = '\0';
-                printf("%s\n", argvalues[0]);
+                free(argvalues[argcount - 1]);
+                argvalues[argcount - 1] = NULL;
+                argcount = argcount - 1;
                 back = 1;
             }
+            
             pid_t pid = fork();
             //dans l'enfant.
             if (pid == 0) {
                 if(back == 1) {
                     int descr = open("/dev/null", O_RDWR);
                     //stdin devient descr, on évite les conflits avec le shell.
-                    dup2(descr, STDIN_FILENO);
-                    dup2(descr, STDOUT_FILENO);
+                    int res = dup2(descr, STDIN_FILENO);
+                    printf("%d", res);
                     close(descr);
+                    
+                    //On configure les signaux a masquer chez 
+                    //l'enfant afin que SIGINT soit ignoré.
+                    //Ctrl+C ne stoppera pas le background task.
+                    sigset_t child_mask;
+                    sigemptyset(&child_mask);
+                    sigaddset(&child_mask, SIGINT);
+                    sigprocmask(SIG_BLOCK, &child_mask, NULL);
                 }
-                //execvp sends SIGCHLD.
+                //execvp "sends" SIGCHLD.
                 int res = execvp(argvalues[0], argvalues); 
                 if (res == -1) {
-                    printf("%s\n", strerror(errno));
+                    printf("%s \n", strerror(errno));
                     exit(EXIT_FAILURE);
                 } else {
                     exit(EXIT_SUCCESS);
@@ -114,13 +103,15 @@ int main() {
             //dans le parent, pid est celui de l'enfant.
             //si back == 1, pid est le background pid 
             } else if(pid > 0) {
-                
+                printf("\033[0;37m");
+            
                 //dans le parent on attends que l'enfant se termine.
-                if (back == 0) {
+                //si il est en foreground.
+                if (back == 0) { 
                     fore_pid = pid;
-                    //back_pid = 0;
                     //status allows to check state of program at exit.
                     int status = 0;
+                    //très bien, faire while not error.
                     dontzombie:sleep(0);
                     int res = waitpid(pid, &status, 0);
                     if (res > 0) {
@@ -128,8 +119,7 @@ int main() {
                             printf("\nForeground terminated by signal \n");
                         printf("Foreground job exited with code 0\n");
                         fore_pid = 0;
-                        goto start;
-
+                        continue;
                     } else if (res == -1) {
                         printf("Foreground job exit error \n");
                         printf("Error : %s \n", strerror(errno));
@@ -142,14 +132,14 @@ int main() {
                         //check status.
                         printf("Foreground job exited with code %d \n", status);
                     }
-                } else if (back == 1) { //sinon c'est que c'est un background task.
+                } else if (back == 1) { 
+                    //sinon c'est que c'est un background task.
                     //ici on a le pid de l'enfant pid, on s'en  sert dans 
                     //gordon_child_handler.
                     back_pid = pid;
                 }
             }
         }
-        printf("gordon@%s> ", getcwd(NULL, 0));
     }
     return 0;
 }
