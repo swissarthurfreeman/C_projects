@@ -30,16 +30,14 @@ int main() {
         char * res = fgets(input, 1024, stdin);
         
         //certains signaux interrompent fgets, faut faire gaffe.
-        if(res == NULL) { 
+        if(res == NULL) 
             continue;
-        }
 
         //on enlève newline sinon ça casse tout.
         for(int i = 0; i < 1024; i++) {
             if (input[i] == '\n') {
-                if (i == 0) {
+                if (i == 0)
                     goto start; //cas ou on a juste appuyé sur enter.
-                }
                 printf("\033[0;37m");
                 input[i] = '\0';
             }
@@ -48,11 +46,26 @@ int main() {
         int argcount = 0;
         //tableau de chaînes de caractères. (taille fixe à 10)
         char * argvalues[10] = {};
+        int redirect_out = 0;
+        char * file_name;
+
         char * token = strtok(input, " ");
-        
+
         while (token != NULL) {
+            
+            //redirection de flux.
+            if(strcmp(token, ">") == 0) {
+                token = strtok(NULL, " ");
+                file_name = malloc(sizeof(char)*strlen(token));
+                strncpy(file_name, token, sizeof(char)*strlen(token));
+                redirect_out = 1;
+                printf("%s\n", file_name);
+                break;
+            }
+
             argvalues[argcount] = malloc(sizeof(char)*strlen(token));
             strncpy(argvalues[argcount], token, strlen(token)*sizeof(char));
+           
             token = strtok(NULL, " ");
             argcount += 1;
         }
@@ -77,24 +90,23 @@ int main() {
             pid_t pid = fork();
             //dans l'enfant.
             if (pid == 0) {
-                if(back == 1) {
-                    int descr = open("/dev/null", O_RDWR);
-                    //stdin devient descr, on évite les conflits avec le shell.
-                    int res = dup2(descr, STDIN_FILENO);
-                    printf("%d", res);
-                    close(descr);
+                //on configure l'enfant afin d'ingorer SIGINT (si c'est un background task)
+                if(back == 1) 
+                    config_background_task();
                     
-                    //On configure les signaux a masquer chez 
-                    //l'enfant afin que SIGINT soit ignoré.
-                    //Ctrl+C ne stoppera pas le background task.
-                    sigset_t child_mask;
-                    sigemptyset(&child_mask);
-                    sigaddset(&child_mask, SIGINT);
-                    sigprocmask(SIG_BLOCK, &child_mask, NULL);
+                //si on a une redirection de stdout solved using : 
+                //https://stackoverflow.com/questions/19846272/redirecting-i-o-implementation-of-a-shell-in-c
+                if(redirect_out == 1) {
+                    //literraly changed this line to exactly what stack overflow said.
+                    int output_file = open(file_name, O_WRONLY | O_CREAT, 0666);
+                    int res = dup2(output_file, STDOUT_FILENO);
+                    close(output_file); //and closed output_file, by some magic it works.
                 }
-                //execvp "sends" SIGCHLD.
-                int res = execvp(argvalues[0], argvalues); 
-                if (res == -1) {
+
+                //program launched by execvp sends when exited SIGCHLD (fork).
+                int res = execvp(argvalues[0], argvalues);
+                
+                if(res == -1) {
                     printf("%s \n", strerror(errno));
                     exit(EXIT_FAILURE);
                 } else {
@@ -117,12 +129,13 @@ int main() {
                     if (res > 0) {
                         if (WIFSIGNALED(status)) 
                             printf("\nForeground terminated by signal \n");
-                        printf("Foreground job exited with code 0\n");
+                        printf("Foreground job exited with code %d\n", status);
                         fore_pid = 0;
                         continue;
                     } else if (res == -1) {
-                        printf("Foreground job exit error \n");
+                        printf("Foreground job exit error (status: %d) \n", status);
                         printf("Error : %s \n", strerror(errno));
+                        printf("Reattempting exit...\n");
                         //en cas d'erreur on refait un waitpid jusqu'à ce que 
                         //cela passe, on évite les zombies.
                         goto dontzombie;
