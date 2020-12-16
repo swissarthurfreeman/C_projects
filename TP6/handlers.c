@@ -13,25 +13,29 @@
 pid_t fore_pid; 
 pid_t back_pid;
 
+//Gordon handler handles SIGINT and SIGHUP.
 extern void gordon_handler(int signum) {
     switch(signum) {
         case SIGINT:
             //ici il faut rediriger vers le processus principal.
             //si y'a un foreground task.
             if(fore_pid > 0) {
-                printf("Killed foreground \n");
                 kill(fore_pid, SIGINT);
+                write(STDOUT_FILENO, "\nKilled foreground\n", 20);
                 break;
             }
             //sinon c'est que y'a pas de foreground task, donc on fait rien.
             //ctrl+C ne ferme pas le shell dans le shell.
             break;
+        //If sighup is received, we must redirecrt this to foreground
+        //and background processes. 
         case SIGHUP:
-            printf("SIGHUP received, redirecting and exiting...\n");
+            write(STDOUT_FILENO, "SIGHUP received, redirecting and exiting...\n", 45);
             if(fore_pid > 0) 
                 kill(fore_pid, SIGHUP);
             if(back_pid > 0)
                 kill(back_pid, SIGHUP);
+            //after which we exit.
             exit(EXIT_SUCCESS);
             break;
     }
@@ -51,31 +55,32 @@ void gordon_child_handler(int signum, siginfo_t *siginfo, void* unused) {
     }
 }
 
+//set_masks configures the masks and special handlers of the shell.
 extern void set_masks() {
     //gérance de SIGCHLD.
     struct sigaction child_death;
     memset(&child_death, 0, sizeof(child_death));
     child_death.sa_sigaction = gordon_child_handler;
 
-    //SA_RESTART fait en sorte que si un signal
-    //interromp l'execution d'un système call, alors on relance
-    //celui ci une fois que le handler renvoie.
-    child_death.sa_flags = SA_SIGINFO; //man sigaction.
+    //SA_SIGINFO flag allows to use sa_sigaction member
+    //as handler. child_death is only for SGCHLD.
+    child_death.sa_flags = SA_SIGINFO; 
     sigaction(SIGCHLD, &child_death, NULL);
 
-    //gérance des autres
+    //signa is used to manage SIGINT and SIGHUP signals
+    //which require a normal handler.
     struct sigaction signa;
     memset(&signa, 0, sizeof(signa));
     signa.sa_handler = gordon_handler;
     signa.sa_flags = SA_RESTART;
+    sigaction(SIGINT, &signa, NULL);
+    sigaction(SIGHUP, &signa, NULL);
 
+    //parent_mask is configured to ignore
+    //SIGTERM and SIGQUIT signals.
     sigset_t parent_mask;
     sigemptyset(&parent_mask);
     sigaddset(&parent_mask, SIGTERM);
     sigaddset(&parent_mask, SIGQUIT);
-    sigprocmask(SIG_BLOCK, &parent_mask, NULL);
-    //sigaction(SIGTERM, &signa, NULL);
-    //sigaction(SIGQUIT, &signa, NULL);
-    sigaction(SIGINT, &signa, NULL);
-    sigaction(SIGHUP, &signa, NULL);
+    sigprocmask(SIG_BLOCK, &parent_mask, NULL);   
 }

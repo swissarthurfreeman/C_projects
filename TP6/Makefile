@@ -1,5 +1,5 @@
 shell : shell.c builtin.c handlers.c
-	gcc shell.c builtin.c handlers.c -o shell
+	gcc shell.c builtin.c handlers.c -o gordon
 
 clean:
 	rm *.txt *.out

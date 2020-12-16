@@ -1,0 +1,15 @@
+total 372
+-rw-r--r-- 1 gordon gordon    104 Dec 16 14:58 Makefile
+-rw-r--r-- 1 gordon gordon 110802 Dec 14 10:40 TP6.pdf
+-rw-r--r-- 1 gordon gordon 117455 Dec 14 10:52 TP6_presentation_part2.pdf
+-rw-r--r-- 1 gordon gordon   1480 Dec 16 15:59 builtin.c
+-rw-r--r-- 1 gordon gordon     78 Dec 14 18:42 builtin.h
+-rwxr-xr-x 1 gordon gordon  18400 Dec 16 16:28 gordon
+-rw-r--r-- 1 gordon gordon   2848 Dec 16 16:26 handlers.c
+-rw-r--r-- 1 gordon gordon    123 Dec 14 17:39 handlers.h
+-rw-r--r-- 1 gordon gordon   4238 Dec 15 15:46 main.zip
+-rw-r--r-- 1 gordon gordon  20392 Dec 16 15:52 manuel.odt
+-rw-r--r-- 1 gordon gordon  48284 Dec 16 15:53 manuel.pdf
+-rw-r--r-- 1 gordon gordon      0 Dec 16 16:28 outputfile
+-rwxr-xr-x 1 gordon gordon  18352 Dec 15 16:12 shell
+-rw-r--r-- 1 gordon gordon   6976 Dec 16 16:28 shell.c

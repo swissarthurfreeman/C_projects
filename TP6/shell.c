@@ -14,30 +14,32 @@
 extern pid_t fore_pid, back_pid;
 
 int main() {
+    //set masks is contained in handlers.c
     set_masks();
 
     while (1) {
-        
+        //color banter.
         start:printf("\033[1;31m");
         printf("gordon");    
         printf("\033[1;34m");
         printf("@%s> " , getcwd(NULL, 0));
         printf("\033[0;37m");
         
-        //sigaction(SIGINT, &signa, NULL); //permet de Ctrl+C a l'infini.
         //On récupère l'entrée utilisateur avec fgets. (max 1024 charactères)
         char * input = malloc(1024);
         char * res = fgets(input, 1024, stdin);
         
         //certains signaux interrompent fgets, faut faire gaffe.
+        //enquel cas res sera null, et on segfaultera dans le reste du code,
+        //on recommence donc la boucle.
         if(res == NULL) 
             continue;
 
-        //on enlève newline sinon ça casse tout.
+        //On enlève le caractère newline des arguments fournis.
         for(int i = 0; i < 1024; i++) {
             if (input[i] == '\n') {
-                if (i == 0)
-                    goto start; //cas ou on a juste appuyé sur enter.
+                if (i == 0) //cas ou on a juste appuyé sur enter.
+                    goto start;  //on reprends un input.
                 printf("\033[0;37m");
                 input[i] = '\0';
             }
@@ -45,17 +47,29 @@ int main() {
         
         int argcount = 0;
         //tableau de chaînes de caractères. (taille fixe à 10)
+        //donc 10 arguments au maximum. On a rarement besoin de plus.
         char * argvalues[10] = {};
+        //redirect out est un bool qui différencie
+        //si on a utilisé ">" ou pas.
         int redirect_out = 0;
+        //nom du fichier vers lequel on redirect output.
+        //seulement utilisé si on a fourni ">".
         char * file_name;
-
+        //on parse l'input avec strtok, les délimiteurs sont
+        //les espaces.
         char * token = strtok(input, " ");
-
+        //tant qu'on a pas exploré toute la chaine.
         while (token != NULL) {
             
             //redirection de flux.
             if(strcmp(token, ">") == 0) {
-                token = strtok(NULL, " ");
+                //le mot suivant ">" sera le fichier vers lequel on redirige.
+                token = strtok(NULL, " "); 
+                if(token == NULL) {
+                    printf("Requires filename to redirect output to.\n");
+                    goto start;
+                }
+                //on configure le fichier.
                 file_name = malloc(sizeof(char)*strlen(token));
                 strncpy(file_name, token, sizeof(char)*strlen(token));
                 redirect_out = 1;
@@ -63,6 +77,8 @@ int main() {
                 break;
             }
 
+            //sinon, c'est un argument suivant la commande, 
+            //on configure argvalues, on incrémente argcount et on passe au suivant.
             argvalues[argcount] = malloc(sizeof(char)*strlen(token));
             strncpy(argvalues[argcount], token, strlen(token)*sizeof(char));
            
@@ -70,9 +86,9 @@ int main() {
             argcount += 1;
         }
 
-        //ici on execute ce qui était fourni en paramètre
+        //ici on execute le nom du programme (premier paramètre)
         if (strcmp(argvalues[0], "cd") == 0) {
-            printf("Exectue cd \n");
+            printf("Exectue cd \n"); //commandes builtin.
             cd_gordon(argvalues[1]);
         } else if (strcmp(argvalues[0], "exit") == 0) {
             exit_gordon();
@@ -81,12 +97,13 @@ int main() {
             //on écrit gordon@path>nom_programme [options] &
             int back = 0;
             if(argvalues[argcount - 1][0] == '&') {
+                //on vire le &
                 free(argvalues[argcount - 1]);
                 argvalues[argcount - 1] = NULL;
                 argcount = argcount - 1;
-                back = 1;
+                back = 1; //back indique que c'est un background task.
             }
-            
+            //on fork et l'enfant execute le programme.
             pid_t pid = fork();
             //dans l'enfant.
             if (pid == 0) {
@@ -103,7 +120,7 @@ int main() {
                     close(output_file); //and closed output_file, by some magic it works.
                 }
 
-                //program launched by execvp sends when exited SIGCHLD (fork).
+                //program launched by execvp will send SIGCHLD when exited  cf. man (fork).
                 int res = execvp(argvalues[0], argvalues);
                 
                 if(res == -1) {
@@ -123,15 +140,17 @@ int main() {
                     fore_pid = pid;
                     //status allows to check state of program at exit.
                     int status = 0;
-                    //très bien, faire while not error.
                     dontzombie:sleep(0);
+                    //on attends de reçevoir SIGCHLD.
                     int res = waitpid(pid, &status, 0);
+                    //si res = pid_enfant > 0 c'est qu'on a bien terminé l'enfant.
                     if (res > 0) {
                         if (WIFSIGNALED(status)) 
-                            printf("\nForeground terminated by signal \n");
+                            printf("Foreground terminated by signal \n");
                         printf("Foreground job exited with code %d\n", status);
                         fore_pid = 0;
                         continue;
+                    //si waitpid n'a pas fonctionné, on doit recommencer.
                     } else if (res == -1) {
                         printf("Foreground job exit error (status: %d) \n", status);
                         printf("Error : %s \n", strerror(errno));
@@ -139,11 +158,6 @@ int main() {
                         //en cas d'erreur on refait un waitpid jusqu'à ce que 
                         //cela passe, on évite les zombies.
                         goto dontzombie;
-                        if (WIFSIGNALED(status)) 
-                            printf("Foreground terminated by signal \n");
-                    } else {
-                        //check status.
-                        printf("Foreground job exited with code %d \n", status);
                     }
                 } else if (back == 1) { 
                     //sinon c'est que c'est un background task.
