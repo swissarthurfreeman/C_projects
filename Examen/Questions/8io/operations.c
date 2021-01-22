@@ -66,6 +66,7 @@ void transfer ( int fd , int from , int to , int amount ) {
     }
     acquire( fd , to );
     toTotal = get( fd , to );
+    
     set( fd , from , fromTotal -amount );
     set( fd , to , toTotal+amount );
 }
