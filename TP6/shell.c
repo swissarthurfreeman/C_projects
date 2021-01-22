@@ -1,3 +1,10 @@
+/*
+The Gordon Shell main C source
+Written by Arthur Freeman University of Geneva.
+December 2020,
+BSCII, Systemes Informatiques
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
