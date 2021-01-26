@@ -147,6 +147,8 @@ total, et pourtant la valeur du compte acc finale sera 4000, e.g. on a crée
 de l'argent. C'est ce qui se passe si ils ne placent pas de verrou exclusif
 lors de la manipulation des comptes.
 
+Bref, on doit se mettre d'accord !
+
 4. Comment résoudre ce problème ?
 
 Afin de résoudre ce problème les processus DOIVENT ABSOLUMENT vérifier
