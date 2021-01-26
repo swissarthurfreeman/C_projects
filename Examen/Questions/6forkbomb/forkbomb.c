@@ -14,7 +14,7 @@ int main(int argc , char* argv []) {
     printf("%ld\n", limites.rlim_cur);
     
     limites.rlim_cur = 500;
-    limites.rlim_max =500;
+    limites.rlim_max = 500;
     setrlimit(RLIMIT_NPROC, &limites);
 
     getrlimit(RLIMIT_NPROC, &limites);
@@ -43,7 +43,7 @@ int main(int argc , char* argv []) {
 
     printf("%d\n", status);
     //WIFEXITED renvoie vrai si l'enfant c'est bien terminé normalement.
-    if WIFEXITED (status) {
+    if (WIFEXITED (status)) {
         //on imprime la valeur retournée par l'enfant
         //dans le dernier enfant, quand on dépasse la limite de ressources
         //on renvoie EACCESS
@@ -71,15 +71,22 @@ finira par totalement remplir la mémoire a l'infini si les enfants ne se termin
 pas. ça la remplit entièrement, tant que c'est possible. Il est possible d'éviter
 cela en appliquant des limites sur le processus via setrlimit, avec le flag RLIMIT_NPROC
 on peut limiter la quantité de processus engendrée par ce processus, et si la soft limit 
-est dépassée fork() génère une erreur EAGAIN.
+est dépassée fork() génère une erreur EAGAIN. Quand on arrive a la quantitée maximale de RAM
+le swap vas se mettre a travailler, et une fois qu'on a plus de place en swap, on a des problèmes...
 
 3. A la ligne 16, est-ce que le code d’erreur errno est nécéssairement le même que le
 code d’erreur rapporté par perror ?
 
-Oui, perror prends un string de l'utilisateur qui décrit (en général) la fonction
+Perror prends un string de l'utilisateur qui décrit (en général) la fonction
 qui a généré une erreur, et perror accède a errno qui est une variable globale, 
 et ira chercher dans la liste des erreurs globales du système, qui est indexée par
-errno. (du moins a l'époque selon la man)
+errno. (du moins a l'époque selon la man) Perror fonctionne toujours, mais cela dit
+errno dans perror n'est pas forcément le même errno que lors de exit(errno), en effet,
+on pourrait envoyer un SIGINT et dans un handler peut être qu'on modifierait errno 
+juste après avoir fait perror() mais AVANT avoir effectué exit(errno), enquel cas 
+errno serait modifié. Il faudrait mettre des variables temporaires afin de s'assurer 
+que la bonne valeur de errno soit renvoiyée.
+
 
 4. A la ligne 22, a quoi correspond la valeur de WEXITSTATUS(status) par rapport
 au processus enfant (i.e. à quelle autre variable est-elle reliée) ?

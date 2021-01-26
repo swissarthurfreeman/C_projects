@@ -81,7 +81,8 @@ void transfer ( int fd , int from , int to , int amount ) {
     }
     //on vérouille le compte vers qui on transfert
     acquire( fd , to );
-    //on récupère la valeur dans l'autre compte
+
+    //on récupère la valeur dans l'autre compte qu'on aura vérouillé
     toTotal = get( fd , to );
     
     //on fait l'échange
@@ -106,6 +107,7 @@ int main( int argc , char ** argv ) {
 
     printf( "\n=== APRES =======================\n" );
     display( fd );
+    //close relâche les verrous du processus.
     close(fd);
     return EXIT_SUCCESS ;
 }
@@ -129,7 +131,10 @@ si acc = 2         ^~~~~~~~~
 3. Ce code peut poser problème si plusieurs processus indépendants essayent
 d’accéder simultanéments au mêmes comptes. Expliquez ?
 
+https://www.gnu.org/software/libc/manual/html_node/File-Locks.html
+
 Les appels systèmes read write ne vérifient pas la précense ou non de verrous.
+Les verrous posés via fcntl sont des ADVISORY LOCKS, TOUT LE MONDE DOIT COOPÉRER.
 Il faut que les utilisateurs ayant droits se mettent d'accord afin de vérifier
 qu'il y ait un verrou présent ou pas. Sinon c'est le chaos, surtout si deux 
 transferts sont effectués en même temps sur un même compte, on peut avoir des cas
@@ -139,10 +144,12 @@ Process A, B
 A récupère la valeur dans acc, B aussi, la valeur a ce moment est de 10'000
 A fait un transfert de 6000 vers acc2, B aussi, on aura transféré 12'000 au 
 total, et pourtant la valeur du compte acc finale sera 4000, e.g. on a crée
-de l'argent.
+de l'argent. C'est ce qui se passe si ils ne placent pas de verrou exclusif
+lors de la manipulation des comptes.
 
 4. Comment résoudre ce problème ?
 
-Afin de résoudre ce problème les deux processus DOIVENT ABSOLUMENT vérifier
-la précense ou non de verrous.
+Afin de résoudre ce problème les processus DOIVENT ABSOLUMENT vérifier
+la précense ou non de verrous. Ou bien on peut faire du MANDATORY LOCKING mais
+il faut spécialement l'activer sur le filesystem et c'est pas standard.
 */

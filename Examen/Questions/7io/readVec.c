@@ -77,9 +77,9 @@ int longueur(char * name) {
 
 //Question 3)
 double * readSingle(const char * name, const int i) {
+    int fd = open(name, O_RDONLY);
     //on se mets bien au début ! 
     lseek( fd , 0, SEEK_SET );
-    int fd = open(name, O_RDONLY);
     int length;
     int count = 0;
     double * values;

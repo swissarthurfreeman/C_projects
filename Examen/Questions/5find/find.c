@@ -93,4 +93,17 @@ S_ISDIR, S_ISREG..
 Et on ferait st_mode & S_ISDIR
 Si c'est différent de 0, c'est que le bit de directoire est activé.
 
+1. Que fait le programme suivant ?
+
+2. Décrivez le code et son fonctionement en détail.
+
+3. Ce programe comporte un défaut majeur, il ne se termine jamais. Pourquoi ?
+
+On ne filtre pas . et .. ! 
+
+4. Les lignes 25 et 34 ne sont pas compatible POSIX. Pourquoi ? Comment y
+remédier ?
+
+Faut pas se servir de dirent, faut utiliser stat ! 
+
 */

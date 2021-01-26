@@ -78,6 +78,7 @@ void cellule(char* plateau , int x, int y) {
         else if(cpt == 3) //si elle a 3 voisines, elle vit
             *cell = 1; //si elle était déjà vivante, ça change rien.
 
+        //selon la man le comportement est indéfini avec SCHED_OTHER en priorité 0...
         sched_yield ();
     }
 
@@ -93,7 +94,7 @@ int main () {
     size_t mem_size = NB_LIGNES * NB_COLS * sizeof(char);
     
     //on ouvre un objet mémoire partagée
-    //ce fichie rsera visible dans /dev/shm/MEM_NAME
+    //ce fichier sera visible dans /dev/shm/MEM_NAME
     //mais il faudra encore le mettre dans l'espace virtuel du processus
     //avec mmap.
     //les permissions seront rw par rapport a l'utilisateur
@@ -102,7 +103,7 @@ int main () {
     if (fd_mem == -1)
         exit_err("main , shm_open");
 
-    //on devrait faire ça après le mmap...?
+    //l'objet ne sera que supprimé avec munmap.
     shm_unlink ( MEM_NAME );
     
     //on configure la taille du fichier, mem_size est la taille du plateau
@@ -130,11 +131,19 @@ int main () {
     close(fd_mem);
 
     //Le code commente ci-dessous est en lien avec une des question cidessus
-    /*
+    //on change l'ordonnancement des processus en fonction de la propriété statique
+    //par défaut les prop statique allant de 1 à 99 sont en SCHED_FIFO ou en SCHED_RR. (round robin)
+    //la prop statique 0 est en SCHED_OTHER par défaut (priorité standard on garanti que chaque processus
+    //soit traité après avoir eu un certain nb de dénits de processus)
+
+    
     struct sched_param sp;
-    sp.sched_priority = 1;
-    sched_setscheduler(getpid(), SCHED_FIFO , &sp);
-    */
+    sp.sched_priority = 1; //propriétée statique
+    //on règle pour ce processus en SCHED_FIFO (s'applique également a la descendance)
+    //cela veut dire que chaque processus est executé sans interruption et mis a la fin de la file
+    //après coup.
+    sched_setscheduler(getpid(), SCHED_FIFO , &sp); 
+    
     int i, j;
     /*
     ici on donne l'administration de la cellule a chaque enfant,
@@ -190,10 +199,42 @@ et on le tue en envoyant kill -s SIGINT -GROUP_PROCESS_ID
 
 3. quelle est l’utilité de la fonction sched_yield (ligne 59) dans ce programme.
 
+L'intention derrière (lorsque les lignes sont commentées) : 
+sched_yield abandonne le cpu et fait que le processus appelant soit placé a la fin de la file
+de sa priorité statique. Ici, cela permet de ne pas tomber dans le cas ou on mets a jour 
+deux fois de suite une même  cellule sans avoir mis a jour les autres cellules du tableau,
+sinon c'est un gachi total de ressources, car rien n'aura changé !
+Du moins c'est l'intention, le truc c'est qu'en lisant la man, sched_yield n'a pas
+de comportement défini en priorité 0 et SCHED_OTHER, donc on est pas sûr de ce qui vas se passer.
+Rappel : priorité statique SCHED_OTHER : on choisit un processus dans la liste par rapport
+a une priorité dynamique = valeur nice + nbquantums en état prêt sans avoir de processeur a disposition.
 
 4. Y-a-t-il des conflits dans les ressources utilisées par les différents processus ?
 Expliquez.
 
+Oui, certainement a cause de compte, lorsque l'on compte le nombre de cellules voisines
+d'une cellule A, on récupèrera un compte cpt, mais on a aucune garantie que la cellule
+soit mise à jour de suite, peut être que un autre processus prendra le CPU, mettra a jour
+une de ces cellules qui mourra et ENSUITE mettra a jour la cellule A alors qu'elle n'a
+plus le bon nombre de voisins. D'autres processus peuvent modifier les valeurs partagées. 
 
-5. Imaginons que ce programme tourne sur un proce
+5. Imaginons que ce programme tourne sur un processeur unique, que ce passerait-il 
+si les lignes 85-87 n’étaient pas commentées ?
+
+Par défaut, la propriété statique est de 0, et on est en SCHED_OTHER
+ce qui veux dire que l'on vas mettre a jour chaque cellule de façon égale et après un certain
+nombre de dénis de CPU. 
+
+Avec les lignes 85-87 on mettrait tous les processus du programme en priorité statique 1 avec 
+SCHED_FIFO ferait que cela se comporterait en file, e.g. on mettrait à jour une cellule totalement
+avant de passer la main au processus suivant, on ne serait pas interrompu dans la mise a jour d'une cellule
+et on éviterait les conflits, compte serait toujours correct. Par contre il manque un sched_yield après
+affiche_plateau dans le main ! Sans celui-ci ce sera TOUJOURS le processus parent qui aura accès
+a TOUT le processeur, il faut le mettre en attente avec sched_yield, sinon on affichera juste le plateau 0
+et il ne se termine pas ! 
+Ici c'est le cas ou on a que UN SEUL coeur !
+
+Par contre on mettrait a jour ligne par ligne le plateau, ce qui n'est pas idéal, idéalement il faudrait un
+coeur par cellule ou faire toutes les cellules a la suite.
+
 */

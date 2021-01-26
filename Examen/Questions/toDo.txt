@@ -1,0 +1,4 @@
+io7, io8
+10links
+
+11memory, 12sharedmem, 13sockets

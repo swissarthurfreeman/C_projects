@@ -76,8 +76,11 @@ int longueur(char * name) {
     int count = 0;
     while(read(fd, &length, sizeof(int) != 0)) {
         count++;
+        //on lit le vecteur ici, si on veux l'afficher il suffirait
+        //de mettre un pointeur au lieu de NULL et faire un printf de double.
         read(fd, NULL, length*sizeof(double));
     }
+    return count;
 }
 
 3. Comment faire pour ne lire qu’un seul vecteur (par exemple le troisième de la liste) ? 

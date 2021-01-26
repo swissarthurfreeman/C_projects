@@ -2,8 +2,8 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <signal.h>
-#include <sys/types-h>
-#include <sys/wait b>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <string.h>
 #include <errno.h>
 
@@ -140,7 +140,7 @@ void btn_handler(int sig) {
         //SIG_CREME recu
         case SIG_CREME :
             //on dit a l'enfant de mettre de la creme.
-            if(kill(pidService , SIG_CREME) == 1)
+            if(kill(pidService , SIG_CREME) == 1) //faut mettre -1 au lieu de 1 !
                 exit_err("btn_handler , kill");
             break;
 
@@ -177,6 +177,7 @@ int main(void) {
 1. Combien de processus ce programme génère-t-il ? Décrire le rôle et les actions
 de chaque processus.
 
+On a au plus 2 processus.
 Ce processus vas générer un seul processus, le parent, qui vas attendre des signaux.
 Lors de la réception du signal SIG_CAFE, on vas forker et créer un enfant, qui vas
 "produire" un café. (REGARDER LE CODE ET COMMENTER EN DIRECT SUR LE PDF)
@@ -191,9 +192,17 @@ produit, un deuxième café se produira et ce sera tout.
 3. Que se passe-t-il si l’on appuye sur SIG_CREME sans qu’un café ne soit lancé ?
 Que se passe-t-il si l’on appuye sur SIG_CREME lorsqu’un café est lancé ?
 
+Dans le cas ou on a jamais lancé de café :
 Il ne se passe rien dans le premier cas, en effet, au signal SIG_CREME nous avons
-associé dans le main SIG_IGN qui est une fonction qui ignore ce signal. On aurait 
-pû le faire via un masque aussi, en utilisant sigprocmask.
+associé dans le main SIG_IGN qui est une fonction qui ignore ce signal, le fout 
+a la poubelle, c'est DIFFÉRENT de masquage, en masquage on ignorerait jusqu'à ce
+qu'on retire le masque, enquel cas on executerait SIG_CREME une fois.
+
+Dans le cas ou on a lancé un café auparavant : 
+On vas tenter de kill pidService qui est l'ancient enfant du café précédent, 
+et kill vas générer une erreur qui ne sera pas print, car il y a une faute,
+e.g. il ne vas rien se passer.
+
 
 Dans le deuxième cas, on change la donne. En effet, si on est en train de produire un café
 le masque du parent a changé, et on réceptionne les signaux SIG_CREME et SIG_ANUL.
@@ -209,10 +218,13 @@ se comportera WEXITSTATUS avec des valeurs qui ne sont pas des status. Si vous l
 correctement, on aurait ce message uniquement lorsque l'enfant est interrompu sauvagement, e.g.
 retourne quelque chose différent de 0 depuis son main.
 
+IFEXITED 
+
 5. Pourquoi utiliser la fonction "write" au lieu de "printf" dans les handlers de
 signaux ?
 
 Cela fait partie des règles de programmation des handlers, on évite les effets de bord.
+Un effet de bord est quand une fonction modifie une variable en dehors du scope de la fonction.
 
 
 */

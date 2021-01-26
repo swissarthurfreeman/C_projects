@@ -22,7 +22,7 @@ int handle(char *name) {
         exit( EXIT_FAILURE );
     }
 
-    //on ouvre le named pipe
+    //on ouvre le named pipe faut pas ouvrir en RDWR !
     fifo = open( name , O_RDWR );
     if( fifo < 0 ) {
         perror( "Cannot open the fifo" );
@@ -45,7 +45,6 @@ int handle(char *name) {
     //on gère pas le cas d'overflow.
     buffer *= 2;
 
-
     nwrit = write( fifo , &buffer , sizeof(buffer));
     if ( nwrit < 0 ) {
         perror( "Transmission failure" );
@@ -57,15 +56,26 @@ int handle(char *name) {
 /*
 1. Quel est l’intention de l’extrait de code ci-dessous ?
 
+C'est le code d'un worker qui fait une opération sur un entier qu'il
+multiplie par 2 et qui renvoie a celui qui écrit dans le named pipe.
+
 D'avoir un autre processus qui envoie des valeurs et qui reçoit le
 résultat multiplié par 2.
 
 2. Pourquoi est-ce que cette approche est vouée à l’échec ?
 
-Cette approche marche parfaitement.
+Si il y a plusieurs clients, ça peut mener a des désastres.
+Si ont a plusieurs clients, si client1 envoie val1 a worker,
+et se mets a read en attendant resultat1, mais que pendant que
+worker calcule, un client2 écrit valeur2 a calculer, valeur2
+sera dans le fifo, mais client1 attendant une valeur a lire il 
+la lira, et au lieu d'avoir resultat1 il aura valeur2. 
+
+man 7 fifo
 
 3. Comment y remédier ?
 
-???
+On utilise des sockets, avec un socket par utilisateur et un canal
+d'échange incontaminable par d'autres processus.
 
 */
