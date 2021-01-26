@@ -154,5 +154,4 @@ Bref, on doit se mettre d'accord !
 Afin de résoudre ce problème les processus DOIVENT ABSOLUMENT vérifier
 la précense ou non de verrous. Ou bien on peut faire du MANDATORY LOCKING mais
 il faut spécialement l'activer sur le filesystem et c'est pas standard.
-
 */
